@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Color Tap Challenge</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        
+        .pulse-animation {
+            animation: pulse 1.5s infinite;
+        }
+        
+        .shape {
+            transition: transform 0.1s;
+            cursor: pointer;
+            touch-action: manipulation;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .shape:active {
+            transform: scale(0.9);
+        }
+        
+        .shape.blue {
+            background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+        }
+        
+        .shape.red {
+            background: linear-gradient(135deg, #ef4444, #b91c1c);
+        }
+        
+        .game-container {
+            touch-action: manipulation;
+        }
+    </style>
+</head>
+<body class="bg-gray-900 flex flex-col items-center min-h-screen">
+    <div class="game-container relative w-full max-w-md h-screen overflow-hidden">
+        <div class="absolute top-5 left-1/2 transform -translate-x-1/2 z-50">
+            <div class="bg-black bg-opacity-70 text-white px-6 py-2 rounded-full shadow-lg">
+                <span class="font-bold text-lg">Score: </span>
+                <span id="score" class="font-mono text-xl">0</span>
+            </div>
+        </div>
+        
+        <div id="gameArea" class="game-area w-full h-full bg-gradient-to-br from-gray-800 to-gray-900 relative overflow-hidden"></div>
+        
+        <div id="startScreen" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 z-40">
+            <div class="bg-white p-8 rounded-xl max-w-xs w-full text-center shadow-2xl">
+                <h1 class="text-3xl font-bold mb-4 text-gray-800">Color Tap Challenge</h1>
+                <p class="text-gray-600 mb-6">Tap red circles to score points. Avoid blue ones!</p>
+                <button id="startBtn" class="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-full w-full pulse-animation">
+                    Start Game
+                </button>
+            </div>
+        </div>
+        
+        <div id="gameOver" class="absolute inset-0 flex flex-col items-center justify-center bg-black bg-opacity-70 z-40 hidden">
+            <div class="bg-white p-8 rounded-xl max-w-xs w-full text-center shadow-2xl">
+                <h2 class="text-3xl font-bold mb-2 text-gray-800">Game Over!</h2>
+                <p class="text-gray-600 mb-1">Your score:</p>
+                <p class="text-4xl font-bold mb-6 text-red-500" id="finalScore">0</p>
+                <button id="restartBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-full w-full">
+                    Play Again
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const gameArea = document.getElementById('gameArea');
+        const scoreDisplay = document.getElementById('score');
+        const startBtn = document.getElementById('startBtn');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScore = document.getElementById('finalScore');
+        const restartBtn = document.getElementById('restartBtn');
+
+        let score = 0;
+        let speed = 2;
+        let isPlaying = false;
+        let shapes = [];
+        let animationFrame;
+        let shapeSize = 50;
+
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+        gameArea.addEventListener('click', handleTap);
+        gameArea.addEventListener('touchstart', handleTap, { passive: false });
+
+        function startGame() {
+            isPlaying = true;
+            score = 0;
+            speed = 2;
+            shapeSize = 50;
+            scoreDisplay.textContent = score;
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            
+            // Clear existing shapes
+            shapes.forEach(shape => {
+                if (shape.parentNode) {
+                    shape.remove();
+                }
+            });
+            shapes = [];
+            
+            generateShape();
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function generateShape() {
+            if (!isPlaying) return;
+
+            const shape = document.createElement('div');
+            const isRed = Math.random() < 0.7;
+            shape.className = `shape absolute ${isRed ? 'red' : 'blue'} rounded-full`;
+            
+            // Random size between 40 and 60px
+            const size = Math.floor(Math.random() * 20) + 40;
+            shape.style.width = `${size}px`;
+            shape.style.height = `${size}px`;
+            
+            // Random position (top)
+            shape.style.top = `${Math.random() * (gameArea.offsetHeight - size)}px`;
+            shape.style.left = `${gameArea.offsetWidth}px`;
+            
+            gameArea.appendChild(shape);
+            shapes.push(shape);
+
+            setTimeout(() => generateShape(), Math.random() * 1500 + 500);
+        }
+
+        function gameLoop() {
+            if (!isPlaying) return;
+
+            shapes.forEach((shape, index) => {
+                const currentLeft = parseInt(shape.style.left);
+                const newLeft = currentLeft - speed;
+                shape.style.left = `${newLeft}px`;
+
+                if (newLeft + shape.offsetWidth < 0) {
+                    if (shape.classList.contains('red')) {
+                        gameOver();
+                    } else {
+                        shape.remove();
+                        shapes.splice(index, 1);
+                    }
+                }
+            });
+
+            animationFrame = requestAnimationFrame(gameLoop);
+        }
+
+        function handleTap(e) {
+            if (!isPlaying) return;
+            
+            // Prevent default for touch events to avoid delays
+            if (e.type === 'touchstart') {
+                e.preventDefault();
+            }
+
+            const rect = gameArea.getBoundingClientRect();
+            const x = (e.clientX || e.touches[0].clientX) - rect.left;
+            const y = (e.clientY || e.touches[0].clientY) - rect.top;
+
+            for (let i = shapes.length - 1; i >= 0; i--) {
+                const shape = shapes[i];
+                const shapeRect = shape.getBoundingClientRect();
+                const shapeX = shapeRect.left - rect.left;
+                const shapeY = shapeRect.top - rect.top;
+
+                if (x >= shapeX && x <= shapeX + shapeRect.width &&
+                    y >= shapeY && y <= shapeY + shapeRect.height) {
+                    
+                    if (shape.classList.contains('red')) {
+                        // Score point
+                        score += 10;
+                        scoreDisplay.textContent = score;
+                        
+                        // Increase difficulty
+                        speed += 0.2;
+                        if (score % 50 === 0) {
+                            shapeSize = Math.max(30, shapeSize - 2);
+                        }
+                        
+                        // Add visual feedback
+                        shape.style.transform = 'scale(1.2)';
+                        setTimeout(() => {
+                            if (shape.parentNode) {
+                                shape.remove();
+                            }
+                        }, 100);
+                        
+                        shapes.splice(i, 1);
+                    } else {
+                        // Hit blue - game over
+                        gameOver();
+                    }
+                    return;
+                }
+            }
+        }
+
+        function gameOver() {
+            isPlaying = false;
+            cancelAnimationFrame(animationFrame);
+            finalScore.textContent = score;
+            gameOverScreen.classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
